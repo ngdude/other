@@ -1,0 +1,13 @@
+
+    - CI_DOTNET_PROJECT_DLL=$CI_DOTNET_PROJECT_DLL_1
+    - 'CI_DOTNET_PROJECT_DLL_lower=`echo $CI_DOTNET_PROJECT_DLL | tr "[:upper:]" "[:lower:]"`'
+    - cat ./master/ci/docker/run.sh
+    - echo FROM mcr.microsoft.com/dotnet/aspnet:5.0> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo RUN mkdir -p /app >> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo COPY ./release/$CI_DOTNET_PROJECT_DLL/*  /app/>> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo COPY ./master/ci/docker/run.sh  /app/>> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo RUN chmod +x /app/run.sh>> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo WORKDIR /app>> Docker_$CI_DOTNET_PROJECT_DLL
+    - echo CMD ["/app/run.sh"]>> Docker_$CI_DOTNET_PROJECT_DLL
+
+
