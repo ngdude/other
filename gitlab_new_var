@@ -1,0 +1,20 @@
+image: nginx
+
+stages:
+  - j1
+
+
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  TOKEN: "NZRPa9L421sgsvzRUxLJ"
+  VAR: "NEW_VARIABLE"
+  
+test1:
+  stage: j1
+  image: praqma/network-multitool
+  tags: [docker]
+  script:
+    - env
+    - 'PROJECT_VAR=$(curl -k -s --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$VAR"  | jq .key)'
+    - 'if [[ $PROJECT_VAR != null ]] ; then curl -k --request PUT --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$VAR" --form "value=$VALUE" ; else curl -k --request POST --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables" --form "key=$VAR" --form "value=$VALUE" ; fi'
+
