@@ -1,0 +1,32 @@
+image: nginx
+
+stages:
+  - j1
+
+
+variables:
+  GIT_SSL_NO_VERIFY: "true"
+  TOKEN: "NZRPa9L421sgsvzRUxLJ"
+  
+test1:
+  stage: j1
+  image: praqma/network-multitool
+  tags: [docker]
+  variables:
+    VAR: "SONAR_STATUS"
+  script:
+    - env
+    - 'function get_var { curl -k -s --header "PRIVATE-TOKEN: $2" "$CI_API_V4_URL/projects/$1/variables/$3"  | jq -r .value; }'
+    - 'PROJECT_VAR=$(get_var $CI_PROJECT_ID $TOKEN $VAR)'
+    - echo $PROJECT_VAR
+    - 'while [[ $PROJECT_VAR == "busy" ]] ; do echo $PROJECT_VAR; sleep 10 ; PROJECT_VAR=$(curl -k -s --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$VAR"  | jq -r .value) ; done'
+    - 'if [[ $PROJECT_VAR == null ]] ; then curl -k --request POST --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables" --form "key=$VAR" --form "value=busy"  ; fi'
+    - 'PROJECT_VAR=$(get_var $CI_PROJECT_ID $TOKEN $VAR)'
+    - 'if [[ $PROJECT_VAR == "ready" ]] ; then curl -k --request PUT --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$VAR" --form "value=busy" ; fi'
+    - 'PROJECT_VAR=$(get_var $CI_PROJECT_ID $TOKEN $VAR)'
+    - echo $PROJECT_VAR
+    - x=0
+    - while [[ ! $x -eq 5 ]] ; do x=$((x + 1)) ; echo 111 && sleep 10 && echo $x ; done  
+    - 'curl -k --request PUT --header "PRIVATE-TOKEN: $TOKEN" "$CI_API_V4_URL/projects/$CI_PROJECT_ID/variables/$VAR" --form "value=ready"'
+    - 'PROJECT_VAR=$(get_var $CI_PROJECT_ID $TOKEN $VAR)'
+    - echo $PROJECT_VAR
