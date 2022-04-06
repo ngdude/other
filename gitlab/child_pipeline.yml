@@ -1,0 +1,63 @@
+default:
+  tags: [docker]
+
+# you can delete this line if you're not using Docker
+image: busybox:latest
+
+stages:
+  - setup_deploy
+  - setup_restart
+  - triggers1
+  - test
+  - triggers2 
+  - test2
+
+generate-config1:
+  stage: setup_deploy
+  script:
+    - |
+      for i in `env | grep test_var`
+      do
+      echo "test${i}:" >> test.yml
+      echo "  stage: test" >> test.yml
+      echo "  tags: [docker]" >> test.yml
+      echo "  when: manual" >> test.yml
+      echo "  script:" >> test.yml
+      echo "    - echo \"Deploy ${i}"\" >> test.yml
+       done
+    - cat test.yml
+  artifacts:
+    paths:
+      - test.yml
+
+generate-config2:
+  stage: setup_restart
+  script:
+    - |
+      for i in `env | grep test_var`
+      do
+      echo "test2${i}:" >> test2.yml
+      echo "  stage: test" >> test2.yml
+      echo "  tags: [docker]" >> test2.yml
+      echo "  when: manual" >> test2.yml
+      echo "  script:" >> test2.yml
+      echo "    - echo \"Restart ${i}"\" >> test2.yml
+       done
+    - cat test2.yml
+  artifacts:
+    paths:
+      - test2.yml
+
+trigger-langs-sanity-test1:
+  stage: triggers1 
+  trigger:
+    include:
+      - artifact: test.yml
+        job: generate-config1
+
+trigger-langs-sanity-test2:
+  stage: triggers2 
+  trigger:
+    include:
+      - artifact: test2.yml
+        job: generate-config2
