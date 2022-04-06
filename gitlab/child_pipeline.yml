@@ -6,7 +6,6 @@ image: busybox:latest
 
 stages:
   - setup_deploy
-  - setup_restart
   - triggers1
   - test
   - triggers2 
@@ -25,14 +24,6 @@ generate-config1:
       echo "  script:" >> test.yml
       echo "    - echo \"Deploy ${i}"\" >> test.yml
        done
-    - cat test.yml
-  artifacts:
-    paths:
-      - test.yml
-
-generate-config2:
-  stage: setup_restart
-  script:
     - |
       for i in `env | grep test_var`
       do
@@ -43,9 +34,9 @@ generate-config2:
       echo "  script:" >> test2.yml
       echo "    - echo \"Restart ${i}"\" >> test2.yml
        done
-    - cat test2.yml
   artifacts:
     paths:
+      - test.yml
       - test2.yml
 
 trigger-langs-sanity-test1:
@@ -60,4 +51,4 @@ trigger-langs-sanity-test2:
   trigger:
     include:
       - artifact: test2.yml
-        job: generate-config2
+        job: generate-config1
