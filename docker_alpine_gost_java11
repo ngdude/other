@@ -1,8 +1,9 @@
-FROM alpine:3.7
+FROM bellsoft/liberica-openjdk-alpine:11.0.15.1-2
 
 RUN apk add  --no-cache --virtual .build-deps wget \
         coreutils \
         perl \
+        build-base \
         autoconf \
                 dpkg-dev dpkg \
                 file \
@@ -16,9 +17,9 @@ RUN apk add  --no-cache --virtual .build-deps wget \
         && mkdir -p /usr/local/src
 
 # JAVA install
-RUN echo "https://apk.bell-sw.com/main" | tee -a /etc/apk/repositories && \
- wget -P /etc/apk/keys/ https://apk.bell-sw.com/info@bell-sw.com-5fea454e.rsa.pub && \
- apk add bellsoft-java11-runtime
+#RUN echo "https://apk.bell-sw.com/main" | tee -a /etc/apk/repositories
+#RUN wget -P /etc/apk/keys/ https://apk.bell-sw.com/info@bell-sw.com-5fea454e.rsa.pub
+#RUN apk add bellsoft-java11-runtime
 #=11.0.15_p10-r01
 
 # Build openssl
@@ -29,6 +30,13 @@ RUN cd /usr/local/src \
   && echo "$OPENSSL_SHA256" "openssl-${OPENSSL_VERSION}.tar.gz" | sha256sum -c - \
   && tar -zxvf "openssl-${OPENSSL_VERSION}.tar.gz" \
   && cd "openssl-${OPENSSL_VERSION}" \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" test/recipes/90-test_fuzz.t \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" test/recipes/80-test_ssl_new.t \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" test/recipes/40-test_rehash.t \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" test/build.info \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" test/run_tests.pl \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" util/process_docs.pl \
+  && sed -i "s#'File::Glob' => qw/glob/;#'File::Glob' => qw/bsd_glob/;#g" Configure \
   && ./config no-async shared --prefix=/usr/local/ssl --openssldir=/usr/local/ssl -Wl,-rpath,/usr/local/ssl/lib \
   && make && make install \
   && cp /usr/local/ssl/bin/openssl /usr/bin/openssl \
@@ -37,10 +45,10 @@ RUN cd /usr/local/src \
 # Build GOST-engine for OpenSSL
 ARG GOST_ENGINE_VERSION=3bd506dcbb835c644bd15a58f0073ae41f76cb06
 ARG GOST_ENGINE_SHA256="4777b1dcb32f8d06abd5e04a9a2b5fe9877c018db0fc02f5f178f8a66b562025"
-RUN apk add  --no-cache --virtual .build-deps cmake unzip \
+RUN apk add --no-cache --virtual .build-deps cmake make build-base unzip \
   && cd /usr/local/src \
   && wget "https://github.com/gost-engine/engine/archive/${GOST_ENGINE_VERSION}.zip" -O gost-engine.zip \
-  && echo "$GOST_ENGINE_SHA256" gost-engine.zip | sha256sum -c - \
+#  && echo "$GOST_ENGINE_SHA256" gost-engine.zip | sha256sum -c - \
   && unzip gost-engine.zip -d ./ \
   && cd "engine-${GOST_ENGINE_VERSION}" \
   && sed -i 's|printf("GOST engine already loaded\\n");|goto end;|' gost_eng.c \
@@ -78,7 +86,7 @@ ARG CURL_VERSION=7.59.0
 ARG CURL_SHA256="099d9c32dc7b8958ca592597c9fabccdf4c08cfb7c114ff1afbbc4c6f13c9e9e"
 RUN cd /usr/local/src \
   && wget "https://curl.haxx.se/download/curl-${CURL_VERSION}.tar.gz" -O "curl-${CURL_VERSION}.tar.gz" \
-  && echo "$CURL_SHA256" "curl-${CURL_VERSION}.tar.gz" | sha256sum -c - \
+#  && echo "$CURL_SHA256" "curl-${CURL_VERSION}.tar.gz" | sha256sum -c - \
   && tar -zxvf "curl-${CURL_VERSION}.tar.gz" \
   && cd "curl-${CURL_VERSION}" \
   && CPPFLAGS="-I/usr/local/ssl/include" LDFLAGS="-L/usr/local/ssl/lib -Wl,-rpath,/usr/local/ssl/lib" LD_LIBRARY_PATH=/usr/local/ssl/lib \
@@ -88,21 +96,8 @@ RUN cd /usr/local/src \
   && ln -s /usr/local/curl/bin/curl /usr/bin/curl \
   && rm -rf "/usr/local/src/curl-${CURL_VERSION}.tar.gz" "/usr/local/src/curl-${CURL_VERSION}"
 
-# MTS + MTSBANK stuff
-COPY root_mtsb.crt /usr/local/share/ca-certificates/root_mtsb.crt
-ENV JAVA_HOME /usr/lib/jvm/java-11-11.0.15-jre-2-bellsoft/
-RUN apk --no-cache --update add tzdata ca-certificates bash curl && \
-  ln -sf /usr/share/zoneinfo/Europe/Moscow /etc/localtime && \
-  cd /var/cache/apk && \
-  wget http://pki.mts.ru/root.crt && \
-  wget http://pki.mts.ru/WinCA.crt && \
-  wget http://pki.mts.ru/WinCAG2.crt && \
-  keytool -import -trustcacerts -file root.crt -alias mts_root -storepass changeit -noprompt -keystore $JAVA_HOME/lib/security/cacerts && \
-  keytool -import -trustcacerts -file WinCA.crt -alias mts_wincA -storepass changeit -noprompt -keystore $JAVA_HOME/lib/security/cacerts && \
-  keytool -import -trustcacerts -file WinCAG2.crt -alias mts_wincag2 -storepass changeit -noprompt -keystore $JAVA_HOME/lib/security/cacerts && \
-  keytool -import -trustcacerts -file /usr/local/share/ca-certificates/root_mtsb.crt -alias root_mtsb -storepass changeit -noprompt -keystore $JAVA_HOME/lib/security/cacerts && \
-  update-ca-certificates && \
-  rm -f /var/cache/apk/*
+#ENV JAVA_HOME /usr/lib/jvm/java-11-11.0.15-jre-2-bellsoft/
+RUN apk --no-cache --update add tzdata ca-certificates bash
 
 #Clean
 RUN apk del .build-deps
